@@ -17,14 +17,32 @@ if (process.env.ALLOWED_DIMENSIONS) {
 
 exports.handler = function(event, context, callback) {
   const key = event.queryStringParameters.key;
-  const match = key.match(/((\d+)x(\d+))\/(.*)/);
+
+  const match = key.match(/((\d+|auto)?x(\d+|auto)?\/)?(.+\.(png|jpg|jpeg|tif|tiff|gif|webp))/);
+  //const match = key.match(/((\d+)x(\d+))\/(.*)/);
+
+  if (match === null) {
+    // URL don't match regexp
+    return callback(null, {
+      statusCode: '400',
+      body: JSON.stringify({
+        error: 'Key does not match form: N?xN?/name.[jpeg|jpg|png|tiff|webp]. Not supported image format.'
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+
+  const maxAge = 14 * 24 * 60 * 60
   const dimensions = match[1];
-  const width = parseInt(match[2], 10);
-  const height = parseInt(match[3], 10);
+  const width = (match[2] !== undefined) ? parseInt(match[2], 10) : null; //width == null for autoscale
+  const height = (match[3] !== undefined) ? parseInt(match[3], 10) : null; //height == null for autoscale
   const originalKey = match[4];
+  let originalExtension = match[5];
 
   if(ALLOWED_DIMENSIONS.size > 0 && !ALLOWED_DIMENSIONS.has(dimensions)) {
-     callback(null, {
+    callback(null, {
       statusCode: '403',
       headers: {},
       body: '',
@@ -35,21 +53,22 @@ exports.handler = function(event, context, callback) {
   S3.getObject({Bucket: BUCKET, Key: originalKey}).promise()
     .then(data => Sharp(data.Body)
       .resize(width, height)
-      .toFormat('png')
+      .toFormat(originalExtension)
       .toBuffer()
     )
     .then(buffer => S3.putObject({
-        Body: buffer,
-        Bucket: BUCKET,
-        ContentType: 'image/png',
-        Key: key,
-      }).promise()
+      Body: buffer,
+      Bucket: BUCKET,
+      ContentType: `image/${originalExtension}`,
+      CacheControl: `max-age=${maxAge}`,
+      Key: key,
+    }).promise()
     )
     .then(() => callback(null, {
-        statusCode: '301',
-        headers: {'location': `${URL}/${key}`},
-        body: '',
-      })
+      statusCode: '301',
+      headers: {'location': `${URL}/${key}`},
+      body: '',
+    })
     )
     .catch(err => callback(err))
 }
