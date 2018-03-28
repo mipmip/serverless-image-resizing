@@ -10,23 +10,6 @@ Resources:
       StageName: prod
       Variables:
         LambdaFunctionName: !Ref ResizeFunction
-
-  ImageBucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
-    Properties:
-      AccessControl: PublicRead
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        RoutingRules:
-          - RedirectRule:
-              HttpRedirectCode: 307
-              HostName: !Sub ${Api}.execute-api.${AWS::Region}.amazonaws.com
-              Protocol: https
-              ReplaceKeyPrefixWith: prod?key=
-            RoutingRuleCondition:
-              HttpErrorCodeReturnedEquals: 404
-
   ResizeFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -37,11 +20,11 @@ Resources:
       Timeout: 60
       Environment:
         Variables:
-          BUCKET: !Ref ImageBucket
-          URL: !GetAtt ImageBucket.WebsiteURL
+          BUCKET: brenda-dev-user-projects-in
+          URL: http://brenda-dev-user-projects-in.s3-website-eu-west-1.amazonaws.com
       Policies:
           Statement:
-            - Resource: !Sub arn:aws:s3:::${ImageBucket}/*
+            - Resource: arn:aws:s3:::brenda-dev-user-projects-in/*
               Effect: Allow
               Action:
                 - s3:PutObject
@@ -57,16 +40,17 @@ Resources:
   ImageBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref ImageBucket
+      Bucket: brenda-dev-user-projects-in
       PolicyDocument:
         Statement:
           - Action: s3:GetObject
             Effect: Allow
             Principal: "*"
-            Resource: !Sub arn:aws:s3:::${ImageBucket}/*
+            Resource: arn:aws:s3:::brenda-dev-user-projects-in/*
 
 Outputs:
   BucketWebsiteUrl:
-    Value: !GetAtt ImageBucket.WebsiteURL
+    Value: http://brenda-dev-user-projects-in.s3-website-eu-west-1.amazonaws.com
   Bucket:
-    Value: !Ref ImageBucket
+    Value: brenda-dev-user-projects-in
+  ApiHostName: !Sub ${Api}.execute-api.${AWS::Region}.amazonaws.com
